@@ -272,6 +272,8 @@ void AerialMapDisplay::updateZoom()
 
 void AerialMapDisplay::updateBlocks()
 {
+  // updated tile url may work
+  resetTileServerError();
   // rebuild on next received message
   resetMap();
 }
