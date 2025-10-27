@@ -55,6 +55,47 @@ Please refer to the respective terms of service and copyrights.
 - `Blocks` number of adjacent tiles in addition to the center tile to load, 8 maximum.
 - `Timeout` specifies a timeout since the last received message timestamp, after which the map will be faded out; disable by setting to 0.
 
+## Local Tiles
+
+If you want to load your own local tiles from map data you have downloaded (e.g. https://opengeodata.lgl-bw.de/#/(sidenav:product/dop20)) you should 
+copy the tiles into the `rviz_satellite/tiles/20/` folder (`20` is the required zoom `{z}`) and enter an object URL of 
+`file://{z}/{x}/{y}.png`. When `use local tiles` is checked, the object url must be relative. If you want to visualize in
+an UTM frame the property `Visualize in UTM Frame` should be checked too.
+
+### Slicing your own tiles out of UTM tiff data
+
+1. Download .tiff data from e.g.  https://opengeodata.lgl-bw.de/#/(sidenav:product/dop20)
+2. Copy all relevant .tiff files into one directory (e.g. `input_dir`)
+3. Make sure you have installed the `gdal` library
+
+```commandline
+sudo apt update   
+sudo apt install -y gdal-bin libgdal-dev
+```
+4. Run the Python script `slice_tiles.py`, e.g.:
+```commandline
+python3 ~/workspace/aduulm_sandbox/src/rviz_plugins/rviz_satellite/slice_tiles.py --input_dir ~/Downloads/Tiffs/ --output_dir ~/workspace/aduulm_sandbox/src/rviz_plugins/rviz_satellite/tiles
+```
+
+5. Make sure that the structure of the folder `tiles` is
+```commandline
+tiles/
+└── 20/
+    ├── 553311/
+    │   ├── 362607.png
+    │   ├── 362608.png
+    │   └── ... 
+    ├── 553312/
+    │   ├── 362607.png
+    │   ├── 362608.png
+    │   └── ...
+    ├── .../
+```
+
+### Plugin options for local tiles:
+![options](images/img.png)
+
+
 ## Local Maps
 
 If you want to use a tile server which only supports a specific region instead of the whole world you can enable the `Use Local Map` option. This also means that the zoom levels and tile coverage (see [here](https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Zoom_levels)) deviate and need to be defined manually. In particular, the `local origin` is the top-left corner of the local map region.
