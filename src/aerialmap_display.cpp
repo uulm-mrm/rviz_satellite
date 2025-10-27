@@ -18,6 +18,7 @@ limitations under the License. */
 #include <algorithm>
 #include <utility>
 #include <string>
+#include <regex>
 
 #include <OgreManualObject.h>
 #include <OgreMaterialManager.h>
@@ -129,6 +130,12 @@ AerialMapDisplay::AerialMapDisplay()
     this);
   tf_tolerance_property_->setMin(0.0);
   tf_tolerance_property_->setShouldBeSaved(true);
+
+  use_local_tiles_property_ = new BoolProperty(
+      "Use local tiles", false,
+      "If true, load tiles from a local directory instead of an online server.",
+      this, SLOT(updateTileSource()));
+  use_local_tiles_property_->setShouldBeSaved(true);
 
   local_map_property_ = new BoolProperty(
     "Use Local Map", false,
@@ -249,6 +256,12 @@ void AerialMapDisplay::updateTileUrl()
   resetMap();
 }
 
+void AerialMapDisplay::updateTileSource()
+{
+  tile_map_info_.local_tiles = use_local_tiles_property_->getBool();
+
+  resetMap();
+}
 void AerialMapDisplay::updateZoom()
 {
   // updated zoom may be supported by this tile server
@@ -276,6 +289,7 @@ void AerialMapDisplay::updateLocalTileMapInformation()
   tile_map_info_.origin_y = local_origin_y_property_->getFloat();
   tile_map_info_.origin_crs = local_origin_crs_property_->getStdString();
   tile_map_info_.project_to_utm = visualize_in_utm_frame->getBool();
+  tile_map_info_.local_tiles = use_local_tiles_property_->getBool();
 
   // create transformation if not already set
   if (!tile_map_info_.origin_crs.empty()) {
@@ -408,6 +422,21 @@ void AerialMapDisplay::buildMap(TileCoordinate center_tile, double size)
 void AerialMapDisplay::buildTile(TileCoordinate coordinate, Ogre::Vector2i offset, double size)
 {
   auto tile_url = tile_url_property_->getStdString();
+  if (use_local_tiles_property_->getBool()) {
+    auto filename = std::regex_replace(tile_url, std::regex("file://"), "");
+    if (!(tile_url.find("file://") != std::string::npos)) {
+      setStatus(
+      rviz_common::properties::StatusProperty::Error, PROPERTIES_STATUS,
+      "Object URL must start with 'file://' ");
+      return;
+    }
+    if (QDir::isAbsolutePath(QString::fromStdString(filename))) {
+      setStatus(
+      rviz_common::properties::StatusProperty::Error, PROPERTIES_STATUS,
+      "Object URL has to be relative, in other words, it must not start with '/' ");
+      return;
+    }
+  }
   const TileId tile_id{tile_url, coordinate};
   auto pending_emplace_result = pending_tiles_.emplace(tile_id, tile_client_.request(tile_id));
   rcpputils::assert_true(pending_emplace_result.second, "failed to store tile request");

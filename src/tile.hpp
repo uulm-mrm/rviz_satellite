@@ -84,6 +84,7 @@ struct TileMapInformation
   double origin_x;
   double origin_y;
   std::string origin_crs;
+  bool local_tiles = false;
   bool project_to_utm = false;
 
   // local map projection
