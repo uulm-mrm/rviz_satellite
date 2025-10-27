@@ -19,6 +19,8 @@ limitations under the License. */
 #include <QString>
 #include <QtCore>
 #include <QtNetwork>
+#include <dlfcn.h>
+#include <QDir>
 #include <utility>
 #include <regex>
 
@@ -89,10 +91,11 @@ std::future<QImage> TileClient::request_local(TileId const & tile_id)
 
     auto filename = std::regex_replace(filename_uri, std::regex("file://"), "");
 
-    QImageReader reader(QString::fromStdString(filename));
+    QString tiles_dir = getTileBasePath();
+    QString filename_path = QDir(tiles_dir).filePath(QString::fromStdString(filename));
 
-    if (!reader.canRead())
-    {
+    QImageReader reader(filename_path);
+    if (!reader.canRead()) {
       RVIZ_COMMON_LOG_DEBUG_STREAM("Unable to decode image at " << filename);
       return QImage{ };
     }
@@ -152,6 +155,27 @@ void TileClient::request_finished(QNetworkReply * reply)
   promise_it->second.set_value(reader.read().mirrored());
   tile_promises_.erase(promise_it);
   reply->deleteLater();
+}
+
+QString TileClient::getTileBasePath()
+{
+  Dl_info info;
+  if (dladdr((void*)getTileBasePath, &info))
+  {
+    QString lib_path = QString::fromUtf8(info.dli_fname);
+    QFileInfo lib_info(lib_path);
+
+    QDir base_dir = lib_info.absoluteDir();
+    base_dir.cdUp();
+    base_dir.cdUp();
+    base_dir.cdUp();
+    base_dir.cdUp(); // ../aduulm_sandbox/
+    base_dir.cd("src/rviz_plugins/rviz_satellite/tiles");
+
+    return base_dir.absolutePath();
+  }
+
+  return QDir::currentPath();
 }
 
 }  // namespace rviz_satellite
