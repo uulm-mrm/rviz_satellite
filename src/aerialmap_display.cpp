@@ -131,11 +131,11 @@ AerialMapDisplay::AerialMapDisplay()
   tf_tolerance_property_->setMin(0.0);
   tf_tolerance_property_->setShouldBeSaved(true);
 
-  use_local_tiles_property_ = new BoolProperty(
-      "Use local tiles", false,
-      "If true, load tiles from a local directory instead of an online server.",
+  use_relative_path_ = new BoolProperty(
+      "Use relative object url", false,
+      "If true, load tiles from the plugin intern 'tiles/' directory. Therefore the object URL has to be relative.\ne.g. file://{z}/{x}/{y}.png",
       this, SLOT(updateTileSource()));
-  use_local_tiles_property_->setShouldBeSaved(true);
+  use_relative_path_->setShouldBeSaved(true);
 
   local_map_property_ = new BoolProperty(
     "Use Local Map", false,
@@ -258,7 +258,7 @@ void AerialMapDisplay::updateTileUrl()
 
 void AerialMapDisplay::updateTileSource()
 {
-  tile_map_info_.local_tiles = use_local_tiles_property_->getBool();
+  tile_map_info_.local_tiles = use_relative_path_->getBool();
 
   resetMap();
 }
@@ -291,7 +291,7 @@ void AerialMapDisplay::updateLocalTileMapInformation()
   tile_map_info_.origin_y = local_origin_y_property_->getFloat();
   tile_map_info_.origin_crs = local_origin_crs_property_->getStdString();
   tile_map_info_.project_to_utm = visualize_in_utm_frame->getBool();
-  tile_map_info_.local_tiles = use_local_tiles_property_->getBool();
+  tile_map_info_.local_tiles = use_relative_path_->getBool();
 
   // create transformation if not already set
   if (!tile_map_info_.origin_crs.empty()) {
@@ -424,7 +424,7 @@ void AerialMapDisplay::buildMap(TileCoordinate center_tile, double size)
 void AerialMapDisplay::buildTile(TileCoordinate coordinate, Ogre::Vector2i offset, double size)
 {
   auto tile_url = tile_url_property_->getStdString();
-  if (use_local_tiles_property_->getBool()) {
+  if (use_relative_path_->getBool()) {
     auto filename = std::regex_replace(tile_url, std::regex("file://"), "");
     if (!(tile_url.find("file://") != std::string::npos)) {
       setStatus(

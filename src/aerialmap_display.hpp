@@ -101,7 +101,7 @@ protected:
   rviz_common::properties::FloatProperty * local_origin_x_property_ = nullptr;
   rviz_common::properties::FloatProperty * local_origin_y_property_ = nullptr;
 
-  rviz_common::properties::BoolProperty* use_local_tiles_property_ = nullptr;
+  rviz_common::properties::BoolProperty* use_relative_path_ = nullptr;
   rviz_common::properties::BoolProperty* visualize_in_utm_frame = nullptr;
 
   std::mutex tiles_mutex_;
