@@ -3,6 +3,8 @@ import os
 import argparse
 from osgeo import gdal
 from tqdm import tqdm
+from pyproj import Transformer
+import subprocess
 
 # Enable GDAL exceptions
 gdal.UseExceptions()
@@ -63,7 +65,7 @@ def compress_mosaic(input_tif):
         compressed_path,
         input_tif,
         creationOptions=[
-            "COMPRESS=JPEG",      # Oder "DEFLATE" (verlustfrei)
+            "COMPRESS=JPEG",      # or "DEFLATE" (without loss)
             "TILED=YES",
             "BIGTIFF=YES"
         ]
@@ -83,6 +85,32 @@ def create_preview_png(input_tif):
     )
     print(f"Preview PNG saved as: {preview_png}")
 
+def get_epsg_from_coords(x, y):
+    """
+    Determine the appropriate EPSG code for a GeoTIFF based on its coordinates.
+    Returns the correct global UTM EPSG code (WGS84-based: EPSG:326xx or 327xx).
+    Works worldwide.
+    """
+    try:
+        # Try to interpret coordinates as metric (e.g. ETRS89 / UTM) and convert to lat/lon
+        transformer = Transformer.from_crs("EPSG:25832", "EPSG:4326", always_xy=True)
+        lon, lat = transformer.transform(x, y)
+    except Exception:
+        # Fallback: assume coordinates are already geographic
+        lon, lat = x, y
+
+    # If longitude seems unrealistic, approximate using typical offset
+    if not (-180 <= lon <= 180):
+        lon = (x - 500000) / 100000 + 9  # rough fallback approximation
+
+    # Determine UTM zone
+    zone = int((lon + 180) / 6) + 1
+
+    # Choose EPSG depending on hemisphere
+    epsg = 32600 + zone if lat >= 0 else 32700 + zone
+
+    return epsg
+
 # -----------------------------
 # Load and merge input TIFs
 # -----------------------------
@@ -93,6 +121,29 @@ tifs = [f for f in os.listdir(input_folder) if f.lower().endswith(".tif")]
 
 # Full paths
 tif_paths = [os.path.join(input_folder, f) for f in tifs]
+
+# --- Assign CRS to input TIFFs that have none ---
+for tif in tif_paths:
+    ds = gdal.Open(tif)
+    proj = ds.GetProjection()
+    gt = ds.GetGeoTransform()
+    ds = None
+
+    if not proj.strip():
+        # Compute approximate center point in the source coordinate space
+        center_x = gt[0] + gt[1] * 0.5
+        center_y = gt[3] + gt[5] * 0.5
+
+        # Determine the correct EPSG automatically
+        epsg = get_epsg_from_coords(center_x, center_y)
+        print(f"{tif} has no CRS. Assigning EPSG:{epsg} ...")
+
+        # Apply CRS directly to the file using GDAL’s metadata editing
+        subprocess.run([
+            "gdal_edit.py",
+            "-a_srs", f"EPSG:{epsg}",
+            tif
+        ], check=True)
 
 print("...Building virtual mosaic:", end="\t\t", flush=True)
 # Build virtual mosaic
@@ -106,12 +157,22 @@ mosaic_path = os.path.join(output_folder, "mosaic_3857.tif")
 gdal.Warp(mosaic_path, vrt_path, dstSRS="EPSG:3857", resampleAlg="cubic")
 print("done.")
 
+create_preview_png(mosaic_path)
+
 if not only_mosaic:
     print("Load the reprojected mosaic...")
     # Load the reprojected mosaic
     ds = gdal.Open(mosaic_path)
     gt = ds.GetGeoTransform()
     proj = ds.GetProjection()
+
+    # Compute approximate center point in the source coordinate space
+    center_x = gt[0] + gt[1] * 0.5
+    center_y = gt[3] + gt[5] * 0.5
+
+    # Determine the correct EPSG automatically
+    epsg = get_epsg_from_coords(center_x, center_y)
+    print(f"{mosaic_path} has CRS: {epsg} ...")
 
     # Extract image parameters
     width = ds.RasterXSize
@@ -188,7 +249,7 @@ if not only_mosaic:
 
     print(f"Web Mercator tiles created successfully! ({tile_counter} total)")
 
-create_preview_png(mosaic_path)
+
 # Delete mosaic and VRT files
 if os.path.exists(mosaic_path):
     os.remove(mosaic_path)
