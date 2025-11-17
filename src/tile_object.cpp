@@ -183,7 +183,7 @@ void TileObject::setupMaterial()
   material_->setDepthWriteEnabled(false);
   auto texture_unit_state = material_->getTechnique(0)->getPass(0)->createTextureUnitState();
   // Smoothing of tiles visualization
-  texture_unit_state->setTextureFiltering(Ogre::TFO_NONE);  // no bilinear filtering
+  texture_unit_state->setTextureFiltering(Ogre::TFO_BILINEAR);  // no bilinear filtering
   texture_unit_state->setTextureAddressingMode(Ogre::TextureUnitState::TAM_CLAMP); // do not repeat on border
 }
 

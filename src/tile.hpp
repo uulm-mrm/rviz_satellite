@@ -93,7 +93,7 @@ struct TileMapInformation
 };
 
 /// Max number of adjacent blocks to support.
-static constexpr int MAX_BLOCKS = 30;
+static constexpr int MAX_BLOCKS = 25;
 
 /// Max zoom level to support.
 static constexpr int MAX_ZOOM = 22;

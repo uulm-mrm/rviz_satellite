@@ -89,7 +89,7 @@ AerialMapDisplay::AerialMapDisplay()
 
   visualize_in_utm_frame = new BoolProperty(
       "Visualize in UTM Frame", false,
-      "If true, calculate UTM to LL rotation",
+      "If true, calculate Web/Pseudo Mercator to UTM rotation. This option is needed if your received tiles are not in UTM but you want to visualize in UTM",
       this, SLOT(updateBlocks()));
   visualize_in_utm_frame->setShouldBeSaved(true);
 
