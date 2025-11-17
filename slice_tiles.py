@@ -1,7 +1,7 @@
 import math
 import os
 import argparse
-from osgeo import gdal
+from osgeo import gdal, osr
 from tqdm import tqdm
 from pyproj import Transformer
 import subprocess
@@ -20,6 +20,7 @@ parser.add_argument('--output_dir', help='Output directory', type=str, default=o
 parser.add_argument('--zoom', help='Zoom level (Default: 20)', type=int, default=20)
 parser.add_argument('--tile_size', help='Tile size (Default: 256)', type=int, default=256)
 parser.add_argument('--only_mosaic', help='Only create mosaic', action='store_true')
+parser.add_argument('--utm_tiles', help='Create UTM tiles instead of Web Mercator tiles', action='store_true')
 
 args = parser.parse_args()
 
@@ -34,6 +35,7 @@ os.makedirs(output_folder, exist_ok=True)
 
 tile_size = args.tile_size # Tile size in pixels
 only_mosaic = args.only_mosaic
+utm_tiles = args.utm_tiles
 
 # -----------------------------
 # Helper functions
@@ -111,6 +113,25 @@ def get_epsg_from_coords(x, y):
 
     return epsg
 
+def is_utm(epsg):
+    """Check if EPSG code corresponds to a UTM CRS."""
+    # WGS84 UTM North
+    if 32601 <= epsg <= 32660:
+        return True
+    # WGS84 UTM South
+    if 32701 <= epsg <= 32760:
+        return True
+    # ETRS89 / UTM Europe
+    if 25800 <= epsg <= 25899:
+        return True
+    return False
+
+def get_epsg(ds):
+    """Extract EPSG code from GDAL dataset."""
+    srs = osr.SpatialReference()
+    srs.ImportFromWkt(ds.GetProjection())
+    return int(srs.GetAttrValue("AUTHORITY", 1))
+
 # -----------------------------
 # Load and merge input TIFs
 # -----------------------------
@@ -146,20 +167,37 @@ for tif in tif_paths:
         ], check=True)
 
 print("...Building virtual mosaic:", end="\t\t", flush=True)
-# Build virtual mosaic
 vrt_path = os.path.join(output_folder, "mosaic.vrt")
+
+# 1: Build VRT FIRST
 gdal.BuildVRT(vrt_path, tif_paths)
+
+# 2: Open it AFTER it was created
+ds = gdal.Open(vrt_path)
+epsg = get_epsg(ds)
 print("done.")
 
-print("...Reprojecting mosaic to Web Mercator:", end="\t", flush=True)
-# Reproject to Web Mercator
-mosaic_path = os.path.join(output_folder, "mosaic_3857.tif")
-gdal.Warp(mosaic_path, vrt_path, dstSRS="EPSG:3857", resampleAlg="cubic")
-print("done.")
+if not utm_tiles:
+    print("...Reprojecting mosaic to Web Mercator:", end="\t", flush=True)
+    # Reproject to Web Mercator
+    mosaic_path = os.path.join(output_folder, "mosaic_3857.tif")
+    gdal.Warp(mosaic_path, vrt_path, dstSRS="EPSG:3857", resampleAlg="cubic")
+    print("done.")
+    create_preview_png(mosaic_path)
+else:
+    print("...Checking if already in UTM:", end="\t\t", flush=True)
+    if not is_utm(epsg):
+        print("Error: EPSG code is not a UTM CRS")
+        sys.exit(1)
+    print("done.")
+    mosaic_path = os.path.join(output_folder, "mosaic_utm.tif")
+    print("...Converting VRT to UTM mosaic TIFF:", end="\t", flush=True)
+    gdal.Translate(mosaic_path, vrt_path)
+    print("done.")
+    create_preview_png(mosaic_path)
 
-create_preview_png(mosaic_path)
 
-if not only_mosaic:
+if not only_mosaic and not utm_tiles:
     print("Load the reprojected mosaic...")
     # Load the reprojected mosaic
     ds = gdal.Open(mosaic_path)
@@ -249,6 +287,82 @@ if not only_mosaic:
 
     print(f"Web Mercator tiles created successfully! ({tile_counter} total)")
 
+elif not only_mosaic and utm_tiles:
+    # ================================
+    # UTM TILE GENERATION
+    # ================================
+    if utm_tiles:
+
+        print("Generating UTM tiles...")
+
+        ds = gdal.Open(vrt_path)
+        gt = ds.GetGeoTransform()
+        proj = ds.GetProjection()
+        width = ds.RasterXSize
+        height = ds.RasterYSize
+
+        srs = osr.SpatialReference()
+        srs.ImportFromWkt(proj)
+        epsg = int(srs.GetAttrValue("AUTHORITY", 1))
+
+        if not is_utm(epsg):
+            print(f"ERROR: Mosaic CRS EPSG:{epsg} is NOT UTM")
+            sys.exit(1)
+
+        print(f"Mosaic CRS is UTM (EPSG:{epsg})")
+
+        # Extract mosaic extent in UTM meters
+        minx = gt[0]
+        maxy = gt[3]
+        maxx = minx + width * gt[1]
+        miny = maxy + height * gt[5]
+
+        print(f"UTM extent:\n  X: {minx} – {maxx}\n  Y: {miny} – {maxy}")
+
+        # --- Save extent for your RViz plugin ---
+        with open(os.path.join(output_folder, "utm_origin_info.txt"), "w") as f:
+            f.write(f"Meter per pixel Zoom 0: {abs(gt[1]) * (1 << zoom)}\n")
+            f.write(f"Origin CRS: {epsg}\n")
+            f.write(f"Origin X: {minx}\n")
+            f.write(f"Origin Y: {maxy}\n")
+
+        pixel_size = abs(gt[1])  # meters per pixel = 0.2m
+        print(f"Meters per pixel: {pixel_size}")
+        tile_extent_m = tile_size * pixel_size  # 256px * 0.2m/px = 51.2m
+
+        # Tile grid counts
+        tiles_x = int(math.ceil((maxx - minx) / tile_extent_m))
+        tiles_y = int(math.ceil((maxy - miny) / tile_extent_m))
+
+        print(f"# of UTM tiles: {tiles_x} × {tiles_y}")
+
+        # ---- Create tiles ----
+        for tx in tqdm(range(tiles_x), desc="UTM tile columns"):
+            for ty in range(tiles_y):
+                # Compute tile boundaries in UTM meters
+                x0 = minx + tx * tile_extent_m
+                x1 = x0 + tile_extent_m
+
+                y1 = maxy - ty * tile_extent_m
+                y0 = y1 - tile_extent_m
+
+                out_dir = os.path.join(output_folder, str(tx))
+                os.makedirs(out_dir, exist_ok=True)
+                out_path = os.path.join(out_dir, f"{ty}.png")
+
+                gdal.Warp(
+                    out_path,
+                    vrt_path,
+                    outputBounds=(x0, y0, x1, y1),
+                    width=tile_size,
+                    height=tile_size,
+                    dstSRS=f"EPSG:{epsg}",
+                    format="PNG",
+                    resampleAlg="bilinear",
+                    multithread=True,
+                )
+        srs = None
+        print("UTM tiles written successfully.")
 
 # Delete mosaic and VRT files
 if os.path.exists(mosaic_path):
