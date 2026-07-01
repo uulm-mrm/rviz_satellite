@@ -72,51 +72,49 @@ const QString AerialMapDisplay::PROJ_TRANSFORM_STATUS = "ProjTransform"; // NOLI
 AerialMapDisplay::AerialMapDisplay()
 : RosTopicDisplay()
 {
-  alpha_property_ =
-    new FloatProperty(
-    "Alpha", 0.7, "Amount of transparency to apply to the map.", this,
+
+
+  alpha_property_ = std::make_unique<FloatProperty>("Alpha", 0.7, "Amount of transparency to apply to the map.", this,
     SLOT(updateAlpha()));
   alpha_property_->setMin(0);
   alpha_property_->setMax(1);
   alpha_property_->setShouldBeSaved(true);
 
-  draw_under_property_ = new Property(
-    "Draw Behind", false,
+  draw_under_property_ = std::make_unique<Property>(
+    "Draw Behind", true,
     "Rendering option, controls whether or not the map is always"
     " drawn behind everything else.",
     this, SLOT(updateDrawUnder()));
   draw_under_property_->setShouldBeSaved(true);
 
-  visualize_in_utm_frame = new BoolProperty(
-      "Visualize in UTM Frame", false,
+  visualize_in_utm_frame = std::make_unique<BoolProperty>(
+      "Visualize in UTM Frame", true,
       "If true, calculate Web/Pseudo Mercator to UTM rotation. This option is needed if your received tiles are not in UTM but you want to visualize in UTM",
       this, SLOT(updateBlocks()));
   visualize_in_utm_frame->setShouldBeSaved(true);
 
   // properties for map
-  tile_url_property_ =
-    new StringProperty(
-    "Object URI", "", "URL from which to retrieve map tiles.", this,
+  tile_url_property_ =  std::make_unique<StringProperty>(
+    "Object URI", "https://owsproxy.lgl-bw.de/owsproxy/ows/WMTS_LGL-BW_ATKIS_DOP_20_C?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=DOP_20_C&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX=GoogleMapsCompatible:{z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png", "URL from which to retrieve map tiles.", this,
     SLOT(updateTileUrl()));
   tile_url_property_->setShouldBeSaved(true);
 
   QString const zoom_desc = QString::fromStdString(
     "Zoom level (0 - " + std::to_string(
       MAX_ZOOM) + ")");
-  zoom_property_ = new IntProperty("Zoom", 16, zoom_desc, this, SLOT(updateZoom()));
+  zoom_property_ = std::make_unique<IntProperty>("Zoom", 20, zoom_desc, this, SLOT(updateZoom()));
   zoom_property_->setMin(0);
   zoom_property_->setMax(MAX_ZOOM);
   zoom_property_->setShouldBeSaved(true);
 
   QString const blocks_desc =
     QString::fromStdString("Adjacent blocks (0 - " + std::to_string(MAX_BLOCKS) + ")");
-  blocks_property_ = new IntProperty("Blocks", 3, blocks_desc, this, SLOT(updateBlocks()));
+  blocks_property_ = std::make_unique<IntProperty>("Blocks", 8, blocks_desc, this, SLOT(updateBlocks()));
   blocks_property_->setMin(0);
   blocks_property_->setMax(MAX_BLOCKS);
   blocks_property_->setShouldBeSaved(true);
 
-  timeout_property_ =
-    new FloatProperty(
+  timeout_property_ = std::make_unique<FloatProperty>(
     "Timeout", 3.0,
     "Message header timestamp timeout in seconds. Will start to fade out at half time, ignored if 0.",
     this);
@@ -124,52 +122,48 @@ AerialMapDisplay::AerialMapDisplay()
   timeout_property_->setShouldBeSaved(true);
 
   tf_tolerance_property_ =
-    new FloatProperty(
+    std::make_unique<FloatProperty>(
     "TF tolerance", 0.1,
     "Maximum allowed age of latest transformation looked up from TF.",
     this);
   tf_tolerance_property_->setMin(0.0);
   tf_tolerance_property_->setShouldBeSaved(true);
 
-  use_relative_path_ = new BoolProperty(
+  use_relative_path_ = std::make_unique<BoolProperty>(
       "Use relative object url", false,
       "If true, load tiles from the plugin intern 'tiles/' directory. Therefore the object URL has to be relative.\ne.g. file://{z}/{x}/{y}.png",
       this, SLOT(updateTileSource()));
   use_relative_path_->setShouldBeSaved(true);
 
-  local_map_property_ = new BoolProperty(
+  local_map_property_ = std::make_unique<BoolProperty>(
     "Use Local Map", false,
     "Defines wether the map is bounded to a local region",
     this, SLOT(updateLocalMap()));
   local_map_property_->setShouldBeSaved(true);
   tile_map_info_.local_map = local_map_property_->getValue().toBool();
 
-  local_meter_per_pixel_z0_property_ =
-    new FloatProperty(
+  local_meter_per_pixel_z0_property_ = std::make_unique<FloatProperty>(
     "Meter per Pixel (Zoom 0)", 0.0,
     "Defines the meter per pixel at zoom level 0",
-    local_map_property_);
+    local_map_property_.get());
   local_meter_per_pixel_z0_property_->setMin(0.0);
   local_meter_per_pixel_z0_property_->setShouldBeSaved(true);
 
-  local_origin_crs_property_ =
-    new StringProperty(
+  local_origin_crs_property_ = std::make_unique<StringProperty>(
     "Origin CRS", "", 
-    "Defines the CRS of the local origin (should be a cartesian coordinate system)", local_map_property_);
+    "Defines the CRS of the local origin (should be a cartesian coordinate system)", local_map_property_.get());
   local_origin_crs_property_->setShouldBeSaved(true);
 
-  local_origin_x_property_ =
-    new FloatProperty(
+  local_origin_x_property_ = std::make_unique<FloatProperty>(
     "Origin X ", 0.0,
     "Defines X position of the local origin in given CRS system",
-    local_map_property_);
+    local_map_property_.get());
   local_origin_x_property_->setShouldBeSaved(true);
 
-  local_origin_y_property_ =
-    new FloatProperty(
+  local_origin_y_property_ = std::make_unique<FloatProperty>(
     "Origin Y ", 0.0,
     "Defines Y position of the local origin in given CRS system",
-    local_map_property_);
+    local_map_property_.get());
   local_origin_y_property_->setShouldBeSaved(true);
 }
 
@@ -180,15 +174,21 @@ AerialMapDisplay::~AerialMapDisplay()
 void AerialMapDisplay::onInitialize()
 {
   RTDClass::onInitialize();
+  if (topic_property_->isEmpty()) {
+    topic_property_->setString("/imu/adma/gnss");
+  }
 }
 
 void AerialMapDisplay::onEnable()
 {
+  RTDClass::onEnable();
   scene_node_->setVisible(true);
 }
 
 void AerialMapDisplay::onDisable()
 {
+  RTDClass::onDisable();
+
   scene_node_->setVisible(false);
   resetTileServerError();
   resetMap();

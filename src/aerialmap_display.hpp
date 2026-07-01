@@ -87,22 +87,22 @@ protected:
 
   double computeUTMrotation(double latitude, double longitude);
 
-  rviz_common::properties::StringProperty * tile_url_property_ = nullptr;
-  rviz_common::properties::IntProperty * zoom_property_ = nullptr;
-  rviz_common::properties::IntProperty * blocks_property_ = nullptr;
-  rviz_common::properties::FloatProperty * alpha_property_ = nullptr;
-  rviz_common::properties::FloatProperty * timeout_property_ = nullptr;
-  rviz_common::properties::FloatProperty * tf_tolerance_property_ = nullptr;
-  rviz_common::properties::Property * draw_under_property_ = nullptr;
+  std::unique_ptr<rviz_common::properties::StringProperty> tile_url_property_ ;
+  std::unique_ptr<rviz_common::properties::IntProperty> zoom_property_ ;
+  std::unique_ptr<rviz_common::properties::IntProperty>  blocks_property_ ;
+  std::unique_ptr<rviz_common::properties::FloatProperty> alpha_property_;
+  std::unique_ptr<rviz_common::properties::FloatProperty>  timeout_property_ ;
+  std::unique_ptr<rviz_common::properties::FloatProperty>  tf_tolerance_property_ ;
+  std::unique_ptr<rviz_common::properties::Property>  draw_under_property_ ;
 
-  rviz_common::properties::Property * local_map_property_ = nullptr;
-  rviz_common::properties::FloatProperty * local_meter_per_pixel_z0_property_ = nullptr;
-  rviz_common::properties::StringProperty * local_origin_crs_property_ = nullptr;
-  rviz_common::properties::FloatProperty * local_origin_x_property_ = nullptr;
-  rviz_common::properties::FloatProperty * local_origin_y_property_ = nullptr;
+  std::unique_ptr<rviz_common::properties::Property>  local_map_property_ ;
+  std::unique_ptr<rviz_common::properties::FloatProperty>  local_meter_per_pixel_z0_property_ ;
+  std::unique_ptr<rviz_common::properties::StringProperty>  local_origin_crs_property_ ;
+  std::unique_ptr<rviz_common::properties::FloatProperty>  local_origin_x_property_ ;
+  std::unique_ptr<rviz_common::properties::FloatProperty>  local_origin_y_property_ ;
 
-  rviz_common::properties::BoolProperty* use_relative_path_ = nullptr;
-  rviz_common::properties::BoolProperty* visualize_in_utm_frame = nullptr;
+  std::unique_ptr<rviz_common::properties::BoolProperty> use_relative_path_ ;
+  std::unique_ptr<rviz_common::properties::BoolProperty> visualize_in_utm_frame ;
 
   std::mutex tiles_mutex_;
   TileClient tile_client_;
