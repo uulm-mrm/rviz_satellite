@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.22)
 project(rviz_satellite)
 
 if(NOT CMAKE_CXX_STANDARD)
@@ -17,7 +17,8 @@ find_package(sensor_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(angles REQUIRED)
 
-find_package(Qt5 COMPONENTS Network REQUIRED)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Network)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Network)
 
 add_library(${PROJECT_NAME} SHARED
   src/aerialmap_display.cpp
@@ -35,7 +36,7 @@ target_compile_options(
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 target_link_libraries(${PROJECT_NAME}
   PUBLIC
-  proj Qt5::Network
+  proj Qt${QT_VERSION_MAJOR}::Network
   angles::angles
   rclcpp::rclcpp
   pluginlib::pluginlib
