@@ -26,6 +26,11 @@ add_library(${PROJECT_NAME} SHARED
   src/tile.cpp
   src/tile_client.cpp
   src/tile_object.cpp
+  src/aerialmap_display.hpp
+  src/field.hpp
+  src/tile.hpp
+  src/tile_client.hpp
+  src/tile_object.hpp
 )
 
 target_compile_options(
